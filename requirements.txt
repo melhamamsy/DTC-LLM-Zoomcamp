@@ -6,3 +6,8 @@ pandas
 scikit-learn
 ipywidgets
 seaborn
+
+
+transformers
+accelerate
+bitsandbytes

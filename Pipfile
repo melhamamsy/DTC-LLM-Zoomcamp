@@ -13,6 +13,9 @@ scikit-learn = "*"
 ipywidgets = "*"
 seaborn = "*"
 python-dotenv = "*"
+transformers = "*"
+accelerate = "*"
+bitsandbytes = "*"
 
 [dev-packages]
 ipykernel = "*"
