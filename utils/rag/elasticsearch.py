@@ -31,7 +31,7 @@ def create_elasticsearch_index(
         index_settings
 ):
     try:
-        es_client.indices.create(index=index_name, body=index_settings)
+        es_client.indices.create(index=index_name, body=index_settings, timeout="60s")
         print(f"Successfully created index {index_name}.")
     except RequestError:
         print(f"Found an existing index with name {index_name}, nothing to do.")
@@ -69,7 +69,7 @@ def index_documents(es_client, index_name, documents):
     n_documents = documents.__len__()
     for i, doc in tqdm(enumerate(documents)):
         try:
-            es_client.index(index=index_name, document=doc)
+            es_client.index(index=index_name, document=doc, timeout="60s")
         except RequestError as e:
             print(f"{e}", "index:", i, "-> Skipped...")
             n_skipped += 1

@@ -36,7 +36,7 @@ def build_prompt(query, search_results, prompt_template_path):
 
 
 def llm(client, prompt, model='gpt-4o', generate_params={}):  
-    if model == 'gpt-4o':
+    if model in ['gpt-4o', 'phi3']:
         response = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}]
