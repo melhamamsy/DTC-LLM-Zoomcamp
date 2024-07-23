@@ -1,3 +1,5 @@
 .env
 __pycache__/
 .ipynb_checkpoints/
+hf_cache/
+elasticsearch_data/
