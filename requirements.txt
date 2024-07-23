@@ -6,8 +6,9 @@ pandas
 scikit-learn
 ipywidgets
 seaborn
-
-
+python-dotenv
+ipykernel
 transformers
 accelerate
 bitsandbytes
+sentencepiece

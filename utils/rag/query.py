@@ -1,6 +1,9 @@
 from utils.rag.elasticsearch import elastic_search
 from exceptions.exceptions import SearchContextWrongValueError
 
+from transformers import T5Tokenizer, T5ForConditionalGeneration
+
+
 
 def search(query, index, filter_dict=None, boost=None, num_results=5):
     if not boost:
@@ -32,14 +35,31 @@ def build_prompt(query, search_results, prompt_template_path):
     return prompt
 
 
-def llm(client, prompt, model='gpt-4o'):
-    
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}]
-    )
-    
-    return response.choices[0].message.content
+def llm(client, prompt, model='gpt-4o', generate_params={}):  
+    if model == 'gpt-4o':
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        result = response.choices[0].message.content
+
+    elif model == 'google/flan-t5-small':
+        tokenizer = T5Tokenizer.from_pretrained(model)
+        llm_model = T5ForConditionalGeneration.from_pretrained(model, device_map="auto")
+
+        input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to("cuda")
+        outputs = llm_model.generate(
+            input_ids,
+            max_length=generate_params.get("max_length", 100),
+            num_beams=generate_params.get("num_beams", 5),
+            do_sample=generate_params.get("do_sample", False),
+            temperature=generate_params.get("temperature", 1.0),
+            top_k=generate_params.get("top_k", 50),
+            top_p=generate_params.get("top_p", 0.95),
+        )
+        result = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+    return result
 
 
 def rag(**kwargs):
@@ -55,6 +75,7 @@ def rag(**kwargs):
     client = kwargs.get('client')
     model = kwargs.get('model')
     search_context = kwargs.get('search_context', 'minsearch')
+    generate_params = kwargs.get('generate_params', {})
 
     if search_context == 'minsearch':
         search_results = search(query, index, filter_dict, boost, num_results)
@@ -66,5 +87,5 @@ def rag(**kwargs):
         )
 
     prompt = build_prompt(query, search_results, prompt_template_path)
-    answer = llm(client, prompt, model)
+    answer = llm(client, prompt, model, generate_params)
     return answer
