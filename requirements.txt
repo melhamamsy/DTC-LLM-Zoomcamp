@@ -1,0 +1,8 @@
+tqdm
+notebook
+openai
+elasticsearch
+pandas
+scikit-learn
+ipywidgets
+seaborn
