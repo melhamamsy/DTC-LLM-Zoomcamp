@@ -1,4 +1,4 @@
-from utils.rag.elasticsearch import elastic_search
+from utils.elasticsearch import elastic_search
 from exceptions.exceptions import SearchContextWrongValueError
 
 from transformers import T5Tokenizer, T5ForConditionalGeneration
@@ -35,17 +35,17 @@ def build_prompt(query, search_results, prompt_template_path):
     return prompt
 
 
-def llm(client, prompt, model='gpt-4o', generate_params={}):  
-    if model in ['gpt-4o', 'phi3']:
+def llm(client, prompt, model_name='gpt-4o', generate_params={}):  
+    if model_name in ['gpt-4o', 'phi3']:
         response = client.chat.completions.create(
-            model=model,
+            model=model_name,
             messages=[{"role": "user", "content": prompt}]
         )
         result = response.choices[0].message.content
 
-    elif model == 'google/flan-t5-small':
-        tokenizer = T5Tokenizer.from_pretrained(model)
-        llm_model = T5ForConditionalGeneration.from_pretrained(model, device_map="auto")
+    elif model_name == 'google/flan-t5-small':
+        tokenizer = T5Tokenizer.from_pretrained(model_name)
+        llm_model = T5ForConditionalGeneration.from_pretrained(model_name, device_map="auto")
 
         input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to("cuda")
         outputs = llm_model.generate(
@@ -65,6 +65,7 @@ def llm(client, prompt, model='gpt-4o', generate_params={}):
 def rag(**kwargs):
 
     es_client = kwargs.get('es_client')
+    client = kwargs.get('client')
     query = kwargs.get('query')
     index = kwargs.get('index')
     index_name = kwargs.get('index_name')
@@ -72,8 +73,7 @@ def rag(**kwargs):
     boost = kwargs.get('boost')
     num_results = kwargs.get('num_results')
     prompt_template_path = kwargs.get('prompt_template_path')
-    client = kwargs.get('client')
-    model = kwargs.get('model')
+    model_name = kwargs.get('model_name')
     search_context = kwargs.get('search_context', 'minsearch')
     generate_params = kwargs.get('generate_params', {})
 
@@ -87,5 +87,5 @@ def rag(**kwargs):
         )
 
     prompt = build_prompt(query, search_results, prompt_template_path)
-    answer = llm(client, prompt, model, generate_params)
+    answer = llm(client, prompt, model_name, generate_params)
     return answer

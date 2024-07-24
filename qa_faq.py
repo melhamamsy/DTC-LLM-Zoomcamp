@@ -6,12 +6,12 @@ import os
 PROJECT_DIR = "/mnt/workspace/__ing/llming/DTC/course"
 sys.path.append(PROJECT_DIR)
 
-from utils.rag.elasticsearch import (
+from utils.elasticsearch import (
     create_elasticsearch_client,
     load_index_settings,
 )
 
-from utils.rag.query import rag
+from utils.query import rag
 from openai import OpenAI
 
 
@@ -55,7 +55,7 @@ rag_params = dict(
     boost=boost,
     num_results=num_results,
     prompt_template_path=prompt_template_path,
-    model=model_name,
+    model_name=model_name,
     search_context=search_context
 )
 
