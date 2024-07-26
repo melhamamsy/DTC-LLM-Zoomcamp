@@ -34,8 +34,12 @@ def create_elasticsearch_index(
     try:
         es_client.indices.create(index=index_name, body=index_settings, timeout=f"{timeout}s")
         print(f"Successfully created index {index_name}.")
-    except RequestError:
-        print(f"Found an existing index with name {index_name}, nothing to do.")
+    except RequestError as e:
+        if e.info.get('error', {}).get('type') == 'resource_already_exists_exception':
+            print(f"Found an existing index with name {index_name}, nothing to do.")
+        else:
+            print(e)
+        
     
 
 def search_elasticsearch_indecis(
@@ -70,18 +74,40 @@ def index_documents(
 ):
     n_skipped = 0
     n_documents = documents.__len__()
-    for i, doc in tqdm(enumerate(documents)):
+    idx = 0
+
+    for doc in tqdm(documents):
         try:
             es_client.index(index=index_name, document=doc, timeout=f"{timeout}s")
         except RequestError as e:
-            print(f"{e}", "index:", i, "-> Skipped...")
+            print(f"{e}", "index:", idx, "-> Skipped...")
             n_skipped += 1
             pass
+    
+        idx += 1
 
     n_parsed = n_documents - n_skipped  
     print(
         f"Successfully indexed {n_parsed}/{n_documents} documents in index {index_name}"
     )
+
+
+def get_index_mapping(es_client, index_name):
+    try:
+        # Retrieve the mapping for the given index
+        mapping = es_client.indices.get_mapping(index=index_name)
+        
+        # Extract the properties section which contains the field mappings
+        properties = mapping[index_name]['mappings']['properties']
+        
+        # Extract field names and their types
+        field_types = {field: properties[field]['type'] for field in properties}
+        
+        return field_types
+    
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
 
 
 def elastic_search(es_client, index_name, query, filter_dict, boost, num_results):
@@ -115,3 +141,39 @@ def elastic_search(es_client, index_name, query, filter_dict, boost, num_results
         result_docs.append(hit['_source'])
     
     return result_docs
+
+
+def knn_elastic_search(
+        **kwargs,
+):
+    es_client = kwargs.get('es_client')
+    index_name = kwargs.get('index_name')
+    query_vector = kwargs.get('query_vector')
+    filter_dict = kwargs.get('filter_dict', {})
+    field = kwargs.get('field', "text_vector")
+    k = kwargs.get('k', 5)
+    num_candidates = kwargs.get('num_candidates', 10_000)
+    num_results = kwargs.get('num_results', 5)
+
+    knn_query = {
+        "field": field,
+        "query_vector": query_vector,
+        "k": k,
+        "num_candidates": num_candidates
+    }
+
+    responses = es_client.search(
+        index=index_name,
+        query={
+            "match": filter_dict,
+        },
+        knn=knn_query,
+        size=num_results,
+    )["hits"]["hits"]
+    
+    
+    for i in range(len(responses)):
+        responses[i]["_source"].pop("text_vector")
+
+
+    return responses
