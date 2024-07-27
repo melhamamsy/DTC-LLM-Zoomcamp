@@ -1,0 +1,33 @@
+{
+    "settings": {
+        "number_of_shards": "1",
+        "number_of_replicas": "0"
+    },
+    "mappings": {
+        "properties": {
+            "text": {"type": "text"},
+            "section": {"type": "text"},
+            "question": {"type": "text"},
+            "course": {"type": "keyword"},
+            "id": {"type": "keyword"},
+            "question_vector": {
+                "type": "dense_vector",
+                "dims": "384",
+                "index": "true",
+                "similarity": "cosine"
+            },
+            "text_vector": {
+                "type": "dense_vector",
+                "dims": "384",
+                "index": "true",
+                "similarity": "cosine"
+            },
+            "question_text_vector": {
+                "type": "dense_vector",
+                "dims": "384",
+                "index": "true",
+                "similarity": "cosine"
+            }
+        }
+    }
+}

@@ -13,3 +13,7 @@ class ElasticsearchQueryError(ElasticsearchError):
 class SearchContextWrongValueError(Exception):
     """Ensure that search_context is defined (either minsearch or elasticseach)"""
     pass
+
+class WrongPomptParams(Exception):
+    """Ensure that search_context is defined (either minsearch or elasticseach)"""
+    pass

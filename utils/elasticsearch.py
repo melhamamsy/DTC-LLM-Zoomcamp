@@ -173,7 +173,11 @@ def knn_elastic_search(
     
     
     for i in range(len(responses)):
-        responses[i]["_source"].pop("text_vector")
-
+        responses[i]["_source"] =\
+            {
+                key: value for key, value in\
+                    responses[i]["_source"].items()\
+                    if not key.endswith('_vector')
+            }
 
     return responses

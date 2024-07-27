@@ -34,4 +34,4 @@ def vectorize_sentences(
         doc[f"{field}_vector"] = model.encode(doc[field]).tolist()
         vectorized_documents.append(doc)
     
-    return vectorized_documents
+    return vectorized_documents   

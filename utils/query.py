@@ -1,11 +1,19 @@
 from utils.elasticsearch import elastic_search
-from exceptions.exceptions import SearchContextWrongValueError
-
+from exceptions.exceptions import (
+    SearchContextWrongValueError,
+    WrongPomptParams,
+)
 from transformers import T5Tokenizer, T5ForConditionalGeneration
-
+from utils.utils import (
+    find_parameters,
+    is_sublist,
+)
 
 
 def search(query, index, filter_dict=None, boost=None, num_results=5):
+    """
+    Using minsearch
+    """
     if not boost:
         boost = {}
         
@@ -22,16 +30,29 @@ def search(query, index, filter_dict=None, boost=None, num_results=5):
     return results
 
 
-def build_prompt(query, search_results, prompt_template_path):
-    with open(prompt_template_path, 'r') as f:
-        prompt_template = f.read().strip()
-
+def build_context(search_results):
     context = ""
     
     for doc in search_results:
         context = context + f"section: {doc['section']}\nquestion: {doc['question']}\nanswer: {doc['text']}\n\n"
     
-    prompt = prompt_template.format(question=query, context=context).strip()
+    return context
+
+
+def build_prompt(prompt_template_path, document_dict):
+    with open(prompt_template_path, 'r') as f:
+        prompt_template = f.read().strip()
+
+    expected_params = sorted(find_parameters(prompt_template))
+    provided_params = sorted(list(document_dict.keys()))
+
+    if not is_sublist(main_list=provided_params, sublist=expected_params):
+        raise WrongPomptParams(
+            f"Expected presence of {expected_params}, but got {provided_params}"
+        )
+
+    prompt = prompt_template.format(**document_dict)
+
     return prompt
 
 
@@ -63,29 +84,45 @@ def llm(client, prompt, model_name='gpt-4o', generate_params={}):
 
 
 def rag(**kwargs):
-
-    es_client = kwargs.get('es_client')
-    client = kwargs.get('client')
     query = kwargs.get('query')
-    index = kwargs.get('index')
-    index_name = kwargs.get('index_name')
-    filter_dict = kwargs.get('filter_dict')
-    boost = kwargs.get('boost')
-    num_results = kwargs.get('num_results')
-    prompt_template_path = kwargs.get('prompt_template_path')
-    model_name = kwargs.get('model_name')
     search_context = kwargs.get('search_context', 'minsearch')
-    generate_params = kwargs.get('generate_params', {})
 
     if search_context == 'minsearch':
-        search_results = search(query, index, filter_dict, boost, num_results)
+        search_results = search(
+            query=query, 
+            index=kwargs.get('index'), 
+            filter_dict=kwargs.get('filter_dict'), 
+            boost=kwargs.get('boost'), 
+            num_results=kwargs.get('num_results')
+        )
     elif search_context == 'elasticsearch':
-        search_results = elastic_search(es_client, index_name, query, filter_dict, boost, num_results)
+        search_results = elastic_search(
+            query=query, 
+            es_client=kwargs.get('es_client'), 
+            index_name=kwargs.get('index_name'), 
+            filter_dict=kwargs.get('filter_dict'), 
+            boost=kwargs.get('boost'), 
+            num_results=kwargs.get('num_results')
+        )
     else:
         raise SearchContextWrongValueError(
             "Parameter `search_context` value must be in ['minsearch', 'elasticsearch'] or None"
         )
+    
+    context = build_context(search_results)
+    document_dict = {
 
-    prompt = build_prompt(query, search_results, prompt_template_path)
-    answer = llm(client, prompt, model_name, generate_params)
+        "question": query, "context": context
+    }
+
+    prompt = build_prompt(
+        kwargs.get('prompt_template_path'), 
+        document_dict=document_dict
+    )
+    answer = llm(
+        client=kwargs.get('client'), 
+        prompt=prompt, 
+        model_name=kwargs.get('model_name'), 
+        generate_params=kwargs.get('generate_params', {})
+    )
     return answer
