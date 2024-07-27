@@ -25,7 +25,7 @@ def calculate_relevance(
                 es_client=es_client, 
                 index_name=index_name, 
                 query=q['question'], 
-                filter_dict=filter_dict, 
+                filter_dict=filter_dict,
                 boost=boost,
                 num_results=num_results,
             )

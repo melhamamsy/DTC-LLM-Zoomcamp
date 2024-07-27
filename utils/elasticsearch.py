@@ -144,7 +144,7 @@ def elastic_search(es_client, index_name, query, filter_dict, boost, num_results
 
 
 def knn_elastic_search(
-        **kwargs,
+    **kwargs,
 ):
     es_client = kwargs.get('es_client')
     index_name = kwargs.get('index_name')
@@ -179,5 +179,6 @@ def knn_elastic_search(
                     responses[i]["_source"].items()\
                     if not key.endswith('_vector')
             }
+        responses[i]['id'] = responses[i]["_source"]['id']
 
     return responses

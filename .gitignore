@@ -5,3 +5,4 @@ hf_cache/
 transformers_cache/
 sentence_transformers_cache/
 elasticsearch_data/
+vectorized_documents.pkl
