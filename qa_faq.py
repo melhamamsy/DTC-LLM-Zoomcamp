@@ -1,77 +1,97 @@
-import streamlit as st
+"""
+This module sets up a Streamlit application for invoking a 
+Retrieval-Augmented Generation (RAG) function.
+It configures necessary clients and parameters for interacting 
+with OpenAI's API and Elasticsearch.
+The application allows users to input queries,
+which are processed using the RAG method.
 
-import sys
+Setup:
+- OpenAI client (Ollama backend) for handling API requests.
+- Elasticsearch client for querying a specified index.
+- Parameters for the RAG function, including model name, 
+search context, boosting factors, and filter criteria.
+
+The main function renders a simple Streamlit interface with a text 
+input for user queries and a button to trigger the RAG function.
+The results are displayed within the Streamlit app.
+"""
+
 import os
 
-PROJECT_DIR = "/mnt/workspace/__ing/llming/DTC/course"
-sys.path.append(PROJECT_DIR)
-
-from utils.elasticsearch import (
-    create_elasticsearch_client,
-    load_index_settings,
-)
-
-from utils.query import rag
+import streamlit as st
 from openai import OpenAI
 
+from utils.elasticsearch import create_elasticsearch_client
+from utils.query import rag
+
+## =======> project path:
+PROJECT_DIR = "/mnt/workspace/__ing/llming/DTC/course"
 
 ## =======> ollama setup:
-ollama_host = "localhost"
-ollama_port = "11434"
+OLLAMA_HOST = "localhost"
+OLLAMA_PORT = "11434"
 
-client = OpenAI(
-    base_url=f'http://{ollama_host}:{ollama_port}/v1/',
-    api_key='ollama',
+CLIENT = OpenAI(
+    base_url=f"http://{OLLAMA_HOST}:{OLLAMA_PORT}/v1/",
+    api_key="ollama",
 )
 
 
 ## =======> elastic search setup:
-es_host = "localhost"
-es_port = 9200
-index_name = "course-questions"
-index_settings_path = os.path.join(
-    PROJECT_DIR,
-    "config/elasticsearch/course_qa_index_settings.json"
-)
-index_settings = load_index_settings(index_settings_path)
-
-es_client = create_elasticsearch_client(es_host, es_port)
+ES_HOST = "localhost"
+ES_PORT = 9200
+INDEX_NAME = "course-questions"
+ES_CLIENT = create_elasticsearch_client(ES_HOST, ES_PORT)
 
 
 ## =======> rag setup:
-model_name = "phi3"
-search_context = 'elasticsearch'
-boost = {'question': 3.0, 'section': 0.5}
-filter_dict={'course': 'data-engineering-zoomcamp'}
-num_results = 5
-prompt_template_path = os.path.join(PROJECT_DIR,"prompts/course_qa.txt")
+MODEL_NAME = "phi3"
+SEARCH_CONTEXT = "elasticsearch"
+BOOST = {"question": 3.0, "section": 0.5}
+FILTER_DICT = {"course": "data-engineering-zoomcamp"}
+NUM_RESULTS = 5
+PROMPT_TEMPLATE_PATH = os.path.join(PROJECT_DIR, "prompts/course_qa.txt")
 
-rag_params = dict(
-    es_client=es_client,
-    client=client,
-    query=None,
-    index_name=index_name,
-    filter_dict=filter_dict,
-    boost=boost,
-    num_results=num_results,
-    prompt_template_path=prompt_template_path,
-    model_name=model_name,
-    search_context=search_context
-)
+RAG_PARAMS = {
+    'es_client':ES_CLIENT,
+    'client':CLIENT,
+    'query':None,
+    'index_name':INDEX_NAME,
+    'filter_dict':FILTER_DICT,
+    'boost':BOOST,
+    'num_results':NUM_RESULTS,
+    'prompt_template_path':PROMPT_TEMPLATE_PATH,
+    'model_name':MODEL_NAME,
+    'search_context':SEARCH_CONTEXT,
+}
 
 
 def main():
+    """
+    Main function to render the Streamlit interface for invoking 
+    the RAG function.
+    
+    The interface includes:
+    - A text input box for the user to enter a query.
+    - A button to submit the query.
+    
+    When the button is clicked, the RAG function is called with 
+    the user's query and configured parameters. The result is 
+    displayed within the Streamlit app.
+    """
     st.title("RAG Function Invocation")
 
     user_input = st.text_input("Enter your input:")
 
     if st.button("Ask"):
-        with st.spinner('Processing...'):
-            rag_params['query'] = user_input
-            output = rag(**rag_params)
+        with st.spinner("Processing..."):
+            RAG_PARAMS["query"] = user_input
+            output = rag(**RAG_PARAMS)
             st.success("Completed!")
             st.write(output)
-            rag_params['query'] = None
+            RAG_PARAMS["query"] = None
+
 
 if __name__ == "__main__":
     main()

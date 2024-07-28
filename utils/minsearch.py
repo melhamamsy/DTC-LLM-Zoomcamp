@@ -1,14 +1,17 @@
-import pandas as pd
-
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+"""
+curl https://raw.githubusercontent.com/DataTalksClub/llm-zoomcamp/main/01-intro/minsearch.py
+"""
 
 import numpy as np
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 
 class Index:
     """
-    A simple search index using TF-IDF and cosine similarity for text fields and exact matching for keyword fields.
+    A simple search index using TF-IDF and cosine similarity for text fields and 
+    exact matching for keyword fields.
 
     Attributes:
         text_fields (list): List of text field names to index.
@@ -19,7 +22,7 @@ class Index:
         docs (list): List of documents indexed.
     """
 
-    def __init__(self, text_fields, keyword_fields, vectorizer_params={}):
+    def __init__(self, text_fields, keyword_fields, vectorizer_params=None):
         """
         Initializes the Index with specified text and keyword fields.
 
@@ -28,10 +31,15 @@ class Index:
             keyword_fields (list): List of keyword field names to index.
             vectorizer_params (dict): Optional parameters to pass to TfidfVectorizer.
         """
+        if not vectorizer_params:
+            vectorizer_params = {}
+
         self.text_fields = text_fields
         self.keyword_fields = keyword_fields
 
-        self.vectorizers = {field: TfidfVectorizer(**vectorizer_params) for field in text_fields}
+        self.vectorizers = {
+            field: TfidfVectorizer(**vectorizer_params) for field in text_fields
+        }
         self.keyword_df = None
         self.text_matrices = {}
         self.docs = []
@@ -47,31 +55,41 @@ class Index:
         keyword_data = {field: [] for field in self.keyword_fields}
 
         for field in self.text_fields:
-            texts = [doc.get(field, '') for doc in docs]
+            texts = [doc.get(field, "") for doc in docs]
             self.text_matrices[field] = self.vectorizers[field].fit_transform(texts)
 
         for doc in docs:
             for field in self.keyword_fields:
-                keyword_data[field].append(doc.get(field, ''))
+                keyword_data[field].append(doc.get(field, ""))
 
         self.keyword_df = pd.DataFrame(keyword_data)
 
         return self
 
-    def search(self, query, filter_dict={}, boost_dict={}, num_results=10):
+    def search(self, query, filter_dict=None, boost_dict=None, num_results=10):
         """
         Searches the index with the given query, filters, and boost parameters.
 
         Args:
             query (str): The search query string.
-            filter_dict (dict): Dictionary of keyword fields to filter by. Keys are field names and values are the values to filter by.
-            boost_dict (dict): Dictionary of boost scores for text fields. Keys are field names and values are the boost scores.
+            filter_dict (dict): Dictionary of keyword fields to filter by. 
+                Keys are field names and values are the values to filter by.
+            boost_dict (dict): Dictionary of boost scores for text fields. 
+                Keys are field names and values are the boost scores.
             num_results (int): The number of top results to return. Defaults to 10.
 
         Returns:
             list of dict: List of documents matching the search criteria, ranked by relevance.
         """
-        query_vecs = {field: self.vectorizers[field].transform([query]) for field in self.text_fields}
+        if not filter_dict:
+            filter_dict = {}
+        if not boost:
+            boost = {}
+
+        query_vecs = {
+            field: self.vectorizers[field].transform([query])
+            for field in self.text_fields
+        }
         scores = np.zeros(len(self.docs))
 
         # Compute cosine similarity for each text field and apply boost

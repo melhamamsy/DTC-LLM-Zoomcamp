@@ -1,23 +1,30 @@
+"""
+This module defines custom exceptions for handling all modules related errors.
+"""
+
 class ElasticsearchError(Exception):
     """Base class for all Elasticsearch-related exceptions."""
-    pass
+
 
 class ElasticsearchConnectionError(ElasticsearchError):
     """Exception raised for errors in establishing a connection to Elasticsearch."""
-    pass
+
 
 class ElasticsearchQueryError(ElasticsearchError):
     """Exception raised for errors in querying Elasticsearch."""
-    pass
+
 
 class SearchContextWrongValueError(Exception):
     """Ensure that search_context is defined (either minsearch or elasticseach)"""
-    pass
+
 
 class QueryTypeWrongValueError(Exception):
     """Ensure that query_type is defined (either text or vector)"""
-    pass
+
 
 class WrongPomptParams(Exception):
     """Ensure that the params passed to the prompt template are the expected params"""
-    pass
+
+
+class ModelNotCached(Exception):
+    """Ensure that the passed `model_name` is previously cached, 'gpt-4o', or None"""
