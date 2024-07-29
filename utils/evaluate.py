@@ -12,6 +12,10 @@ from exceptions.exceptions import (QueryTypeWrongValueError,
                                    SearchContextWrongValueError)
 from utils.ollama import get_embedding
 
+from utils.query import (build_prompt,
+                         llm)
+
+from utils.utils import parse_json_response
 
 def calculate_relevance(
     df_ground_truth,
@@ -147,3 +151,25 @@ def mrr(relevance_total):
                 total_score = total_score + 1 / (rank + 1)
 
     return total_score / len(relevance_total)
+
+
+def llm_as_a_judge(
+    client,
+    prompt_template_path,
+    df_to_judge,
+    model_name="gpt-3.5-turbo",
+):
+    results = []
+    
+    for record in tqdm(df_to_judge.to_dict(orient='records')):
+        prompt = build_prompt(
+            prompt_template_path,
+            **record,
+        )
+        
+        response = llm(client, prompt, model_name)
+        response = parse_json_response(response)
+        
+        results.append(response)
+        
+    return results

@@ -39,8 +39,8 @@ def is_sublist(main_list, sublist):
         bool: True if the sublist is found within the main list,
         False otherwise.
     """
-    n = len(sublist)
-    return any(sublist == main_list[i : i + n] for i in range(len(main_list) - n + 1))
+    it = iter(main_list)
+    return all(any(sub_elem == main_elem for main_elem in it) for sub_elem in sublist)
 
 
 def initialize_env_variables(project_root=None):

@@ -66,7 +66,7 @@ def build_context(search_results):
     return context
 
 
-def build_prompt(prompt_template_path, document_dict):
+def build_prompt(prompt_template_path, **document_dict):
     """
     Build a prompt from a template and document dictionary.
 
@@ -115,7 +115,7 @@ def llm(client, prompt, model_name="gpt-4o", generate_params=None):
     if not generate_params:
         generate_params = {}
 
-    if model_name in ["gpt-4o", "phi3"]:
+    if model_name in ["gpt-4o", "gpt-3.5-turbo", "phi3"]:
         response = client.chat.completions.create(
             model=model_name, messages=[{"role": "user", "content": prompt}]
         )
@@ -192,7 +192,7 @@ def rag(**kwargs):
     document_dict = {"question": query, "context": context}
 
     prompt = build_prompt(
-        kwargs.get("prompt_template_path"), document_dict=document_dict
+        kwargs.get("prompt_template_path"), **document_dict
     )
     answer = llm(
         client=kwargs.get("client"),
