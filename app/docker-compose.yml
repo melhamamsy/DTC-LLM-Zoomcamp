@@ -17,6 +17,22 @@ services:
     image: ollama/ollama
     container_name: ollama
     volumes:
-      - ./ollama_data:/root/.ollama
+      - ollama_data:/root/.ollama
     ports:
       - "11434:11434"
+
+  postgres:
+    image: postgres:13
+    container_name: postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  ollama_data:
+  postgres_data:
