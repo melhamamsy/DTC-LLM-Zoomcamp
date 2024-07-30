@@ -33,6 +33,37 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: streamlit
+    environment:
+      - ELASTIC_HOST=elasticsearch
+      - ELASTIC_PORT=${ELASTIC_PORT}
+      - ES_INDEX_NAME=${ES_INDEX_NAME}
+
+      - OLLAMA_HOST=ollama
+      - OLLAMA_PORT=${OLLAMA_PORT}
+      - CHAT_MODEL=${CHAT_MODEL}
+      - EMBED_MODEL=${EMBED_MODEL}
+
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+
+      - PROJECT_DIR="/app"
+    ports:
+      - "${STREAMLIT_PORT:-8501}:8501"
+    depends_on:
+      - elasticsearch
+      - ollama
+      - postgres
+
 volumes:
   ollama_data:
   postgres_data:

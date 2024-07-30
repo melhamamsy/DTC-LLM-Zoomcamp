@@ -11,5 +11,6 @@ COPY exceptions/ exceptions/
 COPY prompts/ prompts/
 COPY config/ config/
 COPY utils/ utils/
+COPY app.py .
 
 CMD ["streamlit", "run", "app.py"]
