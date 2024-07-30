@@ -1,5 +1,10 @@
 import streamlit as st
+import time
 import uuid
+
+from utils.query import get_answer
+from utils.postgres import (save_conversation,
+                            save_feedback)
 
 def print_log(*message):
     print(*message, flush=True)
@@ -16,7 +21,6 @@ def main():
         st.session_state.count = 0
         print_log("Feedback count initialized to 0")
     if 'submitted' not in st.session_state:
-        print('SUBMISSION !!!!!!!!!!!!!!!!!!!!')
         st.session_state.submitted = False
 
     # Course selection
@@ -45,6 +49,29 @@ def main():
 
     if st.button("Submit"):
         print_log(f"User submitted question: {user_input}")
+
+        with st.spinner('Processing...'):
+            print_log(f"Getting answer from assistant using {model_choice} model and {search_type} search")
+            start_time = time.time()
+            answer_data = get_answer(user_input, course, model_choice, search_type)
+            end_time = time.time()
+            print_log(f"Answer received in {end_time - start_time:.2f} seconds")
+            st.success("Completed!")
+            st.write(answer_data['answer'])
+            
+            # Display monitoring information
+            st.write(f"Response time: {answer_data['response_time']:.2f} seconds")
+            st.write(f"Relevance: {answer_data['relevance']}")
+            st.write(f"Model used: {answer_data['model_used']}")
+            st.write(f"Total tokens: {answer_data['total_tokens']}")
+            if answer_data['openai_cost'] > 0:
+                st.write(f"OpenAI cost: ${answer_data['openai_cost']:.4f}")
+
+            # Save conversation to database
+            print_log("Saving conversation to database")
+            save_conversation(st.session_state.conversation_id, user_input, answer_data, course)
+            print_log("Conversation saved successfully")
+
         st.write(f"Question submitted: {user_input}")
         st.session_state.submitted = True
 
@@ -54,12 +81,20 @@ def main():
             st.session_state.submitted = False
             st.session_state.count += 1
             print_log(f"Positive feedback received. New count: {st.session_state.count}")
+
+            save_feedback(st.session_state.conversation_id, 1)
+            print_log("Positive feedback saved to database")
+
             st.rerun()
     with col2:
         if st.button("-1", disabled=not st.session_state.submitted):
             st.session_state.submitted = False
             st.session_state.count -= 1
             print_log(f"Negative feedback received. New count: {st.session_state.count}")
+
+            save_feedback(st.session_state.conversation_id, -1)
+            print_log("Negative feedback saved to database")
+            
             st.rerun()
 
     st.write(f"Current count: {st.session_state.count}")

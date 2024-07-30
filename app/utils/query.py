@@ -6,43 +6,41 @@ results, construct prompts from templates, and generate
 responses using language models.
 """
 
-from transformers import T5ForConditionalGeneration, T5Tokenizer
+import os
+import json
+import time
 
-from exceptions.exceptions import (
-    SearchContextWrongValueError,
-    WrongPomptParams,
-    ModelNotCached,
+from exceptions.exceptions import WrongPomptParams
+from utils.utils import (find_parameters, 
+                         is_sublist, parse_json_response)
+from utils.elasticsearch import create_elasticsearch_client
+from utils.ollama import (create_ollama_client,
+                          get_embedding)
+from utils.openai import create_openai_client
+
+
+## Create clients 
+ES_CLIENT = create_elasticsearch_client(
+    host=os.getenv('ELASTIC_HOST'),
+    port=os.getenv('ELASTIC_PORT'),
 )
-from utils.elasticsearch import elastic_search
-from utils.utils import find_parameters, is_sublist
+OLLAMA_CLIENT = create_ollama_client(
+    ollama_host=os.getenv('OLLAMA_HOST'),
+    ollama_port=os.getenv('OLLAMA_PORT'),
+)
+OPENAI_CLIENT = create_openai_client()
 
 
-def search(query, index, filter_dict=None, boost=None, num_results=5):
-    """
-    Perform a search using MinSearch.
-
-    Args:
-        query (str): The search query.
-        index: The MinSearch index to search.
-        filter_dict (dict, optional): Dictionary of filters.
-        boost (dict, optional): Dictionary of boost values.
-        num_results (int, optional): Number of results to return.
-        Default is 5.
-
-    Returns:
-        list: Search results.
-    """
-    if not boost:
-        boost = {}
-
-    if not filter_dict:
-        filter_dict = {}
-
-    results = index.search(
-        query=query, filter_dict=filter_dict, boost_dict=boost, num_results=num_results
-    )
-
-    return results
+INDEX_NAME = os.getenv('ES_INDEX_NAME')
+PROJECT_DIR = os.getenv('PROJECT_DIR')
+QA_PROMPT_TEMPLATE_PATH = os.path.join(
+    PROJECT_DIR,
+    'prompts/course_qa.txt',
+)
+EVAL_PROMPT_TEMPLATE_PATH = os.path.join(
+    PROJECT_DIR,
+    'prompts/llm_as_a_judge.txt',
+)
 
 
 def build_context(search_results):
@@ -97,107 +95,158 @@ def build_prompt(prompt_template_path, **document_dict):
     return prompt
 
 
-def llm(client, prompt, model_name="gpt-4o", generate_params=None):
+def elastic_search_text(query, course):
     """
-    Generate a response using a language model.
-
-    Args:
-        client: The client instance to use for generating responses.
-        prompt (str): The prompt to send to the model.
-        model_name (str, optional): The name of the model to use.
-        Default is 'gpt-4o'.
-        generate_params (dict, optional): Additional parameters
-        for generation.
-
-    Returns:
-        str: The generated response.
     """
-    if not generate_params:
-        generate_params = {}
+    search_query = {
+        "query": {
+            "bool": {
+                "must": {
+                    "multi_match": {
+                        "query": query,
+                        "fields": ["question^3", "text", "section"],
+                        "type": "best_fields",
+                    }
+                },
+                "filter": {"term": {"course": course}},
+            }
+        },
+    }
 
-    if model_name in ["gpt-4o", "gpt-3.5-turbo", "phi3"]:
-        response = client.chat.completions.create(
-            model=model_name, messages=[{"role": "user", "content": prompt}]
-        )
-        result = response.choices[0].message.content
+    responses = ES_CLIENT.search(
+        index=INDEX_NAME,
+        body=search_query,
+        size=5,
+    )
+    
+    return [hit["_source"] for hit in responses["hits"]["hits"]]    
 
-    elif model_name == "google/flan-t5-small":
-        tokenizer = T5Tokenizer.from_pretrained(model_name)
-        llm_model = T5ForConditionalGeneration.from_pretrained(
-            model_name, device_map="auto"
-        )
 
-        input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to("cuda")
-        outputs = llm_model.generate(
-            input_ids,
-            max_length=generate_params.get("max_length", 100),
-            num_beams=generate_params.get("num_beams", 5),
-            do_sample=generate_params.get("do_sample", False),
-            temperature=generate_params.get("temperature", 1.0),
-            top_k=generate_params.get("top_k", 50),
-            top_p=generate_params.get("top_p", 0.95),
-        )
-        result = tokenizer.decode(outputs[0], skip_special_tokens=True)
+def elastic_search_knn(
+    query_vector, course
+):
+    """
+    """
+    knn = {
+        "field": "question_text_vector",
+        "query_vector": query_vector,
+        "k": 5,
+        "num_candidates": 10_000,
+        "filter": {"term": {"course": course}},
+    }
 
+    search_query = {
+        "knn": knn,
+        "_source": ["text", "section", "question", "course", "id"],
+    }
+
+    responses = ES_CLIENT.search(
+        index=INDEX_NAME,
+        body=search_query,
+        size=5,
+    )
+    
+    return [hit["_source"] for hit in responses["hits"]["hits"]]
+
+
+def llm(prompt, model_choice="ollama/phi3"):
+    """
+    """
+    start_time = time.time()
+
+    if model_choice.startswith('ollama/'):
+        client = OLLAMA_CLIENT
+    elif model_choice.startswith('openai/'):
+        client = OPENAI_CLIENT
     else:
-        raise ModelNotCached(
-            f"`model_name`='{model_name}' is not previously cached, 'gpt-4o', or None"
-        )
+        raise ValueError(f"Unknown model choice: {model_choice}")
+    
+    response = client.chat.completions.create(
+        model=model_choice.split('/')[-1],
+        messages=[{"role": "user", "content": prompt}]
+    )
+    answer = response.choices[0].message.content
+    tokens = {
+        'prompt_tokens': response.usage.prompt_tokens,
+        'completion_tokens': response.usage.completion_tokens,
+        'total_tokens': response.usage.total_tokens
+    }
 
-    return result
+    end_time = time.time()
+    response_time = end_time - start_time
+    
+    return answer, tokens, response_time
 
 
-def rag(**kwargs):
+def evaluate_relevance(question, answer, eval_model):
+    prompt = build_prompt(
+        EVAL_PROMPT_TEMPLATE_PATH,
+        **{'question':question, 'answer':answer}
+    )
+
+    evaluation, tokens, _ = llm(
+        prompt, eval_model
+    )
+    
+    try:
+        json_eval = parse_json_response(evaluation)
+        return json_eval['Relevance'], json_eval['Explanation'], tokens
+    except json.JSONDecodeError:
+        return "UNKNOWN", "Failed to parse evaluation", tokens
+
+
+def calculate_openai_cost(model_choice, tokens):
+    openai_cost = 0
+
+    if model_choice == 'openai/gpt-3.5-turbo':
+        openai_cost = (tokens['prompt_tokens'] * 0.0015 + tokens['completion_tokens'] * 0.002) / 1000
+    elif model_choice in ['openai/gpt-4o', 'openai/gpt-4o-mini']:
+        openai_cost = (tokens['prompt_tokens'] * 0.03 + tokens['completion_tokens'] * 0.06) / 1000
+
+    return openai_cost
+
+
+def get_answer(query, course, model_choice, search_type):
     """
-    Perform Retrieval-Augmented Generation (RAG).
-
-    Args:
-        **kwargs: Arbitrary keyword arguments including query,
-        search_context, index, es_client, index_name, filter_dict,
-        boost, num_results, prompt_template_path, client,
-        model_name, and generate_params.
-
-    Returns:
-        str: The generated answer.
-
-    Raises:
-        SearchContextWrongValueError: If search_context is invalid.
     """
-    query = kwargs.get("query")
-    search_context = kwargs.get("search_context", "minsearch")
-
-    if search_context == "minsearch":
-        search_results = search(
-            query=query,
-            index=kwargs.get("index"),
-            filter_dict=kwargs.get("filter_dict"),
-            boost=kwargs.get("boost"),
-            num_results=kwargs.get("num_results"),
+    if search_type == 'Vector':
+        query_vector = get_embedding(
+            client=OLLAMA_CLIENT, 
+            text=query, 
+            model_name="locusai/multi-qa-minilm-l6-cos-v1",
         )
-    elif search_context == "elasticsearch":
-        search_results = elastic_search(
-            query=query,
-            es_client=kwargs.get("es_client"),
-            index_name=kwargs.get("index_name"),
-            filter_dict=kwargs.get("filter_dict"),
-            boost=kwargs.get("boost"),
-            num_results=kwargs.get("num_results"),
-        )
-    else:
-        raise SearchContextWrongValueError(
-            "Parameter `search_context` value must be in ['minsearch', 'elasticsearch'] or None"
-        )
+        search_results = elastic_search_knn(query_vector, course)
+    elif search_type == 'Text':
+        search_results = elastic_search_text(query, course)
 
     context = build_context(search_results)
     document_dict = {"question": query, "context": context}
 
     prompt = build_prompt(
-        kwargs.get("prompt_template_path"), **document_dict
+        QA_PROMPT_TEMPLATE_PATH, **document_dict
     )
-    answer = llm(
-        client=kwargs.get("client"),
+    answer, tokens, response_time = llm(
         prompt=prompt,
-        model_name=kwargs.get("model_name"),
-        generate_params=kwargs.get("generate_params", {}),
+        model_choice=model_choice,
     )
-    return answer
+    
+    eval_model = os.getenv('EVAL_MODEL', 'ollama/phi3')
+    relevance, explanation, eval_tokens = evaluate_relevance(query, answer, eval_model)
+
+    openai_cost = calculate_openai_cost(model_choice, tokens) +\
+        calculate_openai_cost(eval_model, eval_tokens)
+ 
+    return {
+        'answer': answer,
+        'response_time': response_time,
+        'relevance': relevance,
+        'relevance_explanation': explanation,
+        'model_used': model_choice,
+        'prompt_tokens': tokens['prompt_tokens'],
+        'completion_tokens': tokens['completion_tokens'],
+        'total_tokens': tokens['total_tokens'],
+        'eval_prompt_tokens': eval_tokens['prompt_tokens'],
+        'eval_completion_tokens': eval_tokens['completion_tokens'],
+        'eval_total_tokens': eval_tokens['total_tokens'],
+        'openai_cost': openai_cost,
+    }

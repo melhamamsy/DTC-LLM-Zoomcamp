@@ -3,7 +3,10 @@
 
 import os
 import psycopg
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
+TZ = ZoneInfo("Africa/Cairo")
 
 CREATE_STATEMENTS = {
     'conversations' : """
@@ -111,3 +114,66 @@ def init_db():
             else:
                 conn.execute(CREATE_STATEMENTS[table_name])
                 print(f'Successfully created table {table_name}')
+
+
+def save_conversation(conversation_id, question, answer_data, course, timestamp=None):
+    if timestamp is None:
+        timestamp = datetime.now(TZ)
+
+    conn_info = {
+        'postgres_host':os.getenv("POSTGRES_HOST"),
+        'postgres_user':os.getenv("POSTGRES_USER"),
+        'postgres_password':os.getenv("POSTGRES_PASSWORD"),
+        'postgres_port':os.getenv("POSTGRES_PORT"),
+        'postgres_db':os.getenv("POSTGRES_DB"),
+    }
+    
+    with get_db_connection(**conn_info) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO conversations 
+                (id, question, answer, course, model_used, response_time, relevance, 
+                relevance_explanation, prompt_tokens, completion_tokens, total_tokens, 
+                eval_prompt_tokens, eval_completion_tokens, eval_total_tokens, openai_cost, timestamp)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, COALESCE(%s, CURRENT_TIMESTAMP))
+            """,
+                (
+                    conversation_id,
+                    question,
+                    answer_data["answer"],
+                    course,
+                    answer_data["model_used"],
+                    answer_data["response_time"],
+                    answer_data["relevance"],
+                    answer_data["relevance_explanation"],
+                    answer_data["prompt_tokens"],
+                    answer_data["completion_tokens"],
+                    answer_data["total_tokens"],
+                    answer_data["eval_prompt_tokens"],
+                    answer_data["eval_completion_tokens"],
+                    answer_data["eval_total_tokens"],
+                    answer_data["openai_cost"],
+                    timestamp,
+                ),
+            )
+
+
+def save_feedback(conversation_id, feedback, timestamp=None):
+    if timestamp is None:
+        timestamp = datetime.now(TZ)
+
+    conn_info = {
+        'postgres_host':os.getenv("POSTGRES_HOST"),
+        'postgres_user':os.getenv("POSTGRES_USER"),
+        'postgres_password':os.getenv("POSTGRES_PASSWORD"),
+        'postgres_port':os.getenv("POSTGRES_PORT"),
+        'postgres_db':os.getenv("POSTGRES_DB"),
+    }
+    
+    with get_db_connection(**conn_info) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO feedback (conversation_id, feedback, timestamp) VALUES (%s, %s, COALESCE(%s, CURRENT_TIMESTAMP))",
+                (conversation_id, feedback, timestamp),
+            )

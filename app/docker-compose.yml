@@ -56,7 +56,8 @@ services:
 
       - OPENAI_API_KEY=${OPENAI_API_KEY}
 
-      - PROJECT_DIR="/app"
+      - PROJECT_DIR=/app
+      - EVAL_MODEL=${EVAL_MODEL}
     ports:
       - "${STREAMLIT_PORT:-8501}:8501"
     depends_on:
