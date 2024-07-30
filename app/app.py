@@ -3,8 +3,9 @@ import time
 import uuid
 
 from utils.query import get_answer
-from utils.postgres import (save_conversation,
-                            save_feedback)
+from utils.postgres import (save_conversation, save_feedback,
+                            get_recent_conversations,
+                            get_feedback_stats)
 
 def print_log(*message):
     print(*message, flush=True)
@@ -98,6 +99,28 @@ def main():
             st.rerun()
 
     st.write(f"Current count: {st.session_state.count}")
+
+    st.subheader("Recent Conversations")
+    relevance_filter = st.selectbox(
+        "Filter by relevance:", ["All", "RELEVANT", "PARTLY_RELEVANT", "NON_RELEVANT"]
+    )
+    recent_conversations = get_recent_conversations(
+        limit=5, relevance=relevance_filter if relevance_filter != "All" else None
+    )
+    for conv in recent_conversations:
+        st.write(f"Q: {conv['question']}")
+        st.write(f"A: {conv['answer']}")
+        st.write(f"Relevance: {conv['relevance']}")
+        st.write(f"Model: {conv['model_used']}")
+        st.write("---")
+
+    # Display feedback stats
+    feedback_stats = get_feedback_stats()
+    st.subheader("Feedback Statistics")
+    st.write(f"Thumbs up: {feedback_stats['thumbs_up']}")
+    st.write(f"Thumbs down: {feedback_stats['thumbs_down']}")
+
+    print_log("Streamlit app loop completed")
 
 if __name__ == "__main__":
     main()

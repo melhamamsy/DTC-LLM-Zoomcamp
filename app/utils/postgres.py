@@ -3,6 +3,7 @@
 
 import os
 import psycopg
+from psycopg.rows import dict_row
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -177,3 +178,51 @@ def save_feedback(conversation_id, feedback, timestamp=None):
                 "INSERT INTO feedback (conversation_id, feedback, timestamp) VALUES (%s, %s, COALESCE(%s, CURRENT_TIMESTAMP))",
                 (conversation_id, feedback, timestamp),
             )
+
+
+def get_recent_conversations(limit=5, relevance=None):
+    """
+    """
+    conn_info = {
+        'postgres_host':os.getenv("POSTGRES_HOST"),
+        'postgres_user':os.getenv("POSTGRES_USER"),
+        'postgres_password':os.getenv("POSTGRES_PASSWORD"),
+        'postgres_port':os.getenv("POSTGRES_PORT"),
+        'postgres_db':os.getenv("POSTGRES_DB"),
+    }
+
+    with get_db_connection(**conn_info) as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            query = """
+                SELECT c.*, f.feedback
+                FROM conversations c
+                LEFT JOIN feedback f ON c.id = f.conversation_id
+            """
+            if relevance:
+                query += f" WHERE c.relevance = '{relevance}'"
+            query += " ORDER BY c.timestamp DESC LIMIT %s"
+
+            cur.execute(query, (limit,))
+            return cur.fetchall()
+
+
+def get_feedback_stats():
+    """
+    """
+    conn_info = {
+        'postgres_host':os.getenv("POSTGRES_HOST"),
+        'postgres_user':os.getenv("POSTGRES_USER"),
+        'postgres_password':os.getenv("POSTGRES_PASSWORD"),
+        'postgres_port':os.getenv("POSTGRES_PORT"),
+        'postgres_db':os.getenv("POSTGRES_DB"),
+    }
+
+    with get_db_connection(**conn_info) as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                SELECT 
+                    SUM(CASE WHEN feedback > 0 THEN 1 ELSE 0 END) as thumbs_up,
+                    SUM(CASE WHEN feedback < 0 THEN 1 ELSE 0 END) as thumbs_down
+                FROM feedback
+            """)
+            return cur.fetchone()
