@@ -16,6 +16,9 @@ services:
   ollama:
     image: ollama/ollama
     container_name: ollama
+    environment:
+      - CHAT_MODEL=${CHAT_MODEL}
+      - EMBED_MODEL=${EMBED_MODEL}
     volumes:
       - ollama_data:/root/.ollama
     ports:

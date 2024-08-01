@@ -1,5 +1,6 @@
 import sys
 import os
+import argparse
 
 # Replace with root project dir
 PROJECT_DIR = "/mnt/workspace/__ing/llming/DTC/course/app"
@@ -35,11 +36,11 @@ from utils.postgres import init_db
 from utils.multithread import map_progress
 
 
-def setup_es():
+def setup_es(reindex_es=False):
     """Setup ElasticSearch Index.
     """
     ## ====> ElasticSearch Client
-    es_host = os.environ.get('ELASTIC_HOST', 'localhost')
+    es_host = os.environ.get('ELASTIC_SETUP_HOST', 'localhost')
     es_port = os.environ.get('ELASTIC_PORT', 9200)
     es_client = create_elasticsearch_client(es_host, es_port)
 
@@ -52,6 +53,10 @@ def setup_es():
     index_settings = load_index_settings(index_settings_path)
 
     ## Check: if index is already created, do not recreate.
+    if reindex_es:
+        print("Recreating ElasticSearch Index {index_name}...")
+        remove_elasticsearch_index(es_client, index_name)
+
     if index_name not in search_elasticsearch_indecis(es_client):
         create_elasticsearch_index(es_client, index_name, index_settings)
     ## Check: if the mapping is correct, recreate if not.
@@ -71,7 +76,7 @@ def setup_es():
 
     if get_indexed_documents_count(es_client,index_name)['count'] != len(documents):     
         ## ====> Ollama Client
-        ollama_host = os.environ.get('OLLAMA_HOST', 'localhost')
+        ollama_host = os.environ.get('OLLAMA_SETUP_HOST', 'localhost')
         ollama_port = os.environ.get('OLLAMA_PORT', 11434)
         ollama_client = create_ollama_client(ollama_host, ollama_port)
 
@@ -99,6 +104,14 @@ def setup_es():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Reading control parameters.")
+    parser.add_argument('--reindex_es', type=str, required=True, help='Value of reindex_es')
+    parser.add_argument('--reinit_db', type=str, required=True, help='Value of reinit_db')
+    args = parser.parse_args()
+
+    reindex_es = True if args.reindex_es == "true" else False
+    reinit_db = True if args.reinit_db == "true" else False
+
     initialize_env_variables(PROJECT_DIR)
-    setup_es()
-    init_db()
+    setup_es(reindex_es)
+    init_db(reinit_db)

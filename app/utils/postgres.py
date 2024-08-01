@@ -4,6 +4,7 @@
 import os
 import psycopg
 from psycopg.rows import dict_row
+from psycopg.errors import DatabaseError, OperationalError
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -87,11 +88,30 @@ def check_table_exists(conn, table_name):
     return bool(table_exists)
 
 
-def init_db():
+def drop_db(conn, db_name):
+    """
+    """
+    with conn.cursor() as cur:
+        # Terminate all connections to the target database
+        cur.execute(f"""
+            SELECT pg_terminate_backend(pg_stat_activity.pid)
+            FROM pg_stat_activity
+            WHERE pg_stat_activity.datname = '{db_name}'
+                AND pid <> pg_backend_pid();
+        """)
+        # Drop the target database
+        try:
+            cur.execute(f"DROP DATABASE {db_name};")
+            print(f"Database {db_name} dropped successfully.")
+        except (DatabaseError, OperationalError):
+            print(f"Database {db_name} doesn't exist!")
+
+
+def init_db(reinit_db=False):
     """
     """
     conn_info = {
-        'postgres_host':os.getenv("POSTGRES_HOST"),
+        'postgres_host':os.getenv("POSTGRES_SETUP_HOST"),
         'postgres_user':os.getenv("POSTGRES_USER"),
         'postgres_password':os.getenv("POSTGRES_PASSWORD"),
         'postgres_port':os.getenv("POSTGRES_PORT"),
@@ -100,6 +120,10 @@ def init_db():
 
     ## =====> Database
     with get_db_connection(**conn_info) as conn:
+        if reinit_db:
+            print("Recreating Postgres DB {postgres_db}...")
+            drop_db(conn, postgres_db)
+
         if check_database_exists(conn, postgres_db):
             print(f'Database {postgres_db} already exists')
         else:
@@ -117,7 +141,7 @@ def init_db():
                 print(f'Successfully created table {table_name}')
 
 
-def save_conversation(conversation_id, question, answer_data, course, timestamp=None):
+def save_conversation(conversation_id, question, answer_data, course, timestamp=None, is_setup=False):
     if timestamp is None:
         timestamp = datetime.now(TZ)
 
@@ -128,6 +152,9 @@ def save_conversation(conversation_id, question, answer_data, course, timestamp=
         'postgres_port':os.getenv("POSTGRES_PORT"),
         'postgres_db':os.getenv("POSTGRES_DB"),
     }
+
+    if is_setup:
+        conn_info['postgres_host'] = os.getenv("POSTGRES_SETUP_HOST")
     
     with get_db_connection(**conn_info) as conn:
         with conn.cursor() as cur:
@@ -160,7 +187,7 @@ def save_conversation(conversation_id, question, answer_data, course, timestamp=
             )
 
 
-def save_feedback(conversation_id, feedback, timestamp=None):
+def save_feedback(conversation_id, feedback, timestamp=None, is_setup=False):
     if timestamp is None:
         timestamp = datetime.now(TZ)
 
@@ -171,6 +198,9 @@ def save_feedback(conversation_id, feedback, timestamp=None):
         'postgres_port':os.getenv("POSTGRES_PORT"),
         'postgres_db':os.getenv("POSTGRES_DB"),
     }
+
+    if is_setup:
+        conn_info['postgres_host'] = os.getenv("POSTGRES_SETUP_HOST")
     
     with get_db_connection(**conn_info) as conn:
         with conn.cursor() as cur:

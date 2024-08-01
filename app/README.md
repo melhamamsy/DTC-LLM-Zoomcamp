@@ -1,0 +1,1 @@
+pgcli postgresql://postgres:example@localhost:5432/course_assistant

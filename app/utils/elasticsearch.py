@@ -10,7 +10,6 @@ import json
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import (NotFoundError,
                                       RequestError)
-from tqdm.auto import tqdm
 
 from exceptions.exceptions import ElasticsearchConnectionError
 
