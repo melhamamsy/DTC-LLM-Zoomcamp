@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import re
+import time
 
 from dotenv import load_dotenv
 
@@ -172,3 +173,13 @@ def parse_json_response(response):
         return json.loads(response)
     except ValueError:
         return json.loads(correct_json_string(response))
+    
+
+def sleep_seconds(total_wait_time, logging_interval=5):
+    """
+    """
+    logging_interval = 5
+
+    for remaining in range(total_wait_time, 0, -logging_interval):
+        print(f"Time remaining: {remaining} seconds")
+        time.sleep(logging_interval)

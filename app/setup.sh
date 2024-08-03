@@ -43,7 +43,7 @@ do
         shift # remove the current param from the list
         ;;
         *)
-        echo "Invalid parameter: $param"
+        echo "Invalid parameter: $param, you can only use reinit_db and/or reindex_es or leave plank."
         exit 1
         ;;
     esac

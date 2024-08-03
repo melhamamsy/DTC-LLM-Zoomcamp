@@ -28,3 +28,7 @@ class WrongPomptParams(Exception):
 
 class ModelNotCached(Exception):
     """Ensure that the passed `model_name` is previously cached, 'gpt-4o', or None"""
+
+
+class WrongCliParams(Exception):
+    """Ensure correct params passed to the script call."""
