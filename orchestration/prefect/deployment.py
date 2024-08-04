@@ -1,11 +1,15 @@
 from prefect import flow
+from prefect.runner.storage import GitRepository
 
 if __name__ == "__main__":
     flow.from_source(
-        source=".",
-        entrypoint="getting_started.py:repo_info",
+        source=GitRepository(
+            url="https://github.com/melhamamsy/DTC-LLM-Zoomcamp.git",
+            branch="development/orchestration"
+        ),
+        entrypoint="orchestration/prefect/runtime_info.py:my_flow",
     ).deploy(
-        name="my-first-deployment",
-        work_pool_name="my-managed-pool",
-        cron="*/1 * * * *",  # Closest cron equivalent to every 30 seconds (every minute)
+        name="my-docker-deployment",
+        work_pool_name="my-docker-pool",
+        # cron="*/1 * * * *",
     )

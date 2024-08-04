@@ -1,8 +1,13 @@
 import httpx   # an HTTP client library and dependency of Prefect
 from prefect import flow, task
+from datetime import timedelta
+from prefect.tasks import task_input_hash
 
 
-@task(retries=2)
+@task(
+    retries=2, 
+    cache_key_fn=task_input_hash, cache_expiration=timedelta(hours=1)
+)
 def get_repo_info(repo_owner: str, repo_name: str):
     """Get info about a repo - will retry twice after failing"""
     url = f"https://api.github.com/repos/{repo_owner}/{repo_name}"
@@ -36,4 +41,6 @@ def repo_info(repo_owner: str = "PrefectHQ", repo_name: str = "prefect"):
 
 
 if __name__ == "__main__":
-    repo_info()
+    repo_info.serve(
+        name="my-first-deployment"
+    )

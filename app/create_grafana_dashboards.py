@@ -1,7 +1,6 @@
 import os
 import json
 import argparse
-import time
 
 from utils.utils import initialize_env_variables, sleep_seconds
 from utils.grafana import (drop_grafana_data_source,

@@ -17,3 +17,5 @@ psycopg[c]
 psycopg-binary
 pgcli
 importlib_metadata
+aiohttp
+prefect
